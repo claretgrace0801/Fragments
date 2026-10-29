@@ -1,5 +1,6 @@
 # Fragments: 2D puzzle platformer game
-The game is live at [Fragments](https://pulak.xyz/game)
+GitHub Pages deployment target: [Fragments](https://claretgrace0801.github.io/Fragments/).
+See [deployment setup and status](DEPLOYMENT.md) for the cloud build requirements.
 
 ## Story
 An annoyed Shreyas tore apart Floppy and threw him into the dustbin. Can you help Floppy reclaim his fragments and escape the bin? 

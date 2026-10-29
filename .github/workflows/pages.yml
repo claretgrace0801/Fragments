@@ -1,0 +1,95 @@
+name: Build and deploy Fragments
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Assets/**'
+      - 'Packages/**'
+      - 'ProjectSettings/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build Unity WebGL in the cloud
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - name: Check Unity activation configuration
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        shell: bash
+        run: |
+          if [[ -z "$UNITY_EMAIL" || -z "$UNITY_PASSWORD" ]]; then
+            echo "::error::Add UNITY_EMAIL and UNITY_PASSWORD as repository Actions secrets. Unity requires activation even for cloud builds. See DEPLOYMENT.md."
+            exit 1
+          fi
+          if [[ -z "$UNITY_LICENSE" && -z "$UNITY_SERIAL" ]]; then
+            echo "::error::Add UNITY_LICENSE (Personal license) or UNITY_SERIAL (Pro license) as an Actions secret. See DEPLOYMENT.md."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Cache Unity imports
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Unity-WebGL-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Unity-WebGL-
+
+      - name: Build the game
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        with:
+          targetPlatform: WebGL
+          buildMethod: WebGLBuild.Build
+
+      - name: Check the exported game
+        shell: bash
+        run: |
+          test -s build/WebGL/index.html
+          find build/WebGL/Build -name '*.loader.js' -size +0c | grep -q .
+          find build/WebGL/Build -name '*.wasm' -size +0c | grep -q .
+          find build/WebGL/Build -name '*.data' -size +0c | grep -q .
+          test -s build/WebGL/StreamingAssets/Starting_Scene.mp4
+          test -s build/WebGL/StreamingAssets/Ending_Scene.mp4
+
+      - name: Upload the game for GitHub Pages
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: build/WebGL
+
+  deploy:
+    name: Publish the playable game
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
