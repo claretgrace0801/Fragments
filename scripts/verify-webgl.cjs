@@ -15,7 +15,11 @@ const fs = require('node:fs');
   try {
     const response = await page.goto('https://claretgrace0801.github.io/Fragments/', { waitUntil: 'domcontentloaded', timeout: 60000 });
     if (!response.ok()) throw new Error(`Game page returned ${response.status()}`);
-    await page.waitForFunction(() => typeof unityInstance !== 'undefined', { timeout: 180000 });
+    await page.waitForFunction(() => {
+      const canvas = document.querySelector('#unity-canvas');
+      const loading = document.querySelector('#unity-loading-bar');
+      return canvas && canvas.width > 0 && loading && loading.style.display === 'none';
+    }, null, { timeout: 180000 });
     await page.waitForTimeout(10000);
     await page.screenshot({ path: `${dir}/menu.png` });
     // The game's menu is inside Unity's canvas, rather than the DOM.
